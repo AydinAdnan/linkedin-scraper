@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, ExternalLink, MapPin, Star } from 'lucide-react'
+import { AlertTriangle, ExternalLink, MapPin } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { ExpandableList, ExpandableBadges } from '@/components/Expandable'
+import StarButton from '@/components/StarButton'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MAX_ENTRIES = 3
@@ -42,85 +40,6 @@ function Entry({ title, subtitle, meta }) {
       {subtitle && <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>}
       {meta && <p className="font-mono text-[10px] tracking-wide text-muted-foreground">{meta}</p>}
     </li>
-  )
-}
-
-// Shows the first `max` items; clicking "+N more" reveals the rest inside a
-// capped, independently scrollable area so the card itself never grows.
-function ExpandableList({ items, max, renderItem }) {
-  const [expanded, setExpanded] = useState(false)
-  const overflow = items.length - max
-  const visible = expanded ? items : items.slice(0, max)
-
-  return (
-    <>
-      <ul className={cn('space-y-2', expanded && 'max-h-40 overflow-y-auto pr-1')}>
-        {visible.map(renderItem)}
-      </ul>
-      {overflow > 0 && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-1 pl-2.5 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
-        >
-          {expanded ? 'Show less' : `+${overflow} more`}
-        </button>
-      )}
-    </>
-  )
-}
-
-function ExpandableBadges({ items, max }) {
-  const [expanded, setExpanded] = useState(false)
-  const overflow = items.length - max
-  const visible = expanded ? items : items.slice(0, max)
-
-  return (
-    <div>
-      <div className={cn('flex flex-wrap gap-1', expanded && 'max-h-24 overflow-y-auto pr-1')}>
-        {visible.map((s) => (
-          <Badge key={s} variant="secondary" className="rounded-md px-1.5 py-0 text-[10px] font-normal">
-            {s}
-          </Badge>
-        ))}
-        {!expanded && overflow > 0 && (
-          <Badge
-            asChild
-            variant="outline"
-            className="cursor-pointer rounded-md px-1.5 py-0 text-[10px] font-normal hover:bg-accent"
-          >
-            <button type="button" onClick={() => setExpanded(true)}>
-              +{overflow}
-            </button>
-          </Badge>
-        )}
-      </div>
-      {expanded && overflow > 0 && (
-        <button
-          type="button"
-          onClick={() => setExpanded(false)}
-          className="mt-1 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
-        >
-          Show less
-        </button>
-      )}
-    </div>
-  )
-}
-
-function StarButton({ starred, onToggle }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="icon-sm"
-      onClick={onToggle}
-      aria-pressed={starred}
-      aria-label={starred ? 'Unstar profile' : 'Star profile'}
-      className="absolute right-2.5 top-2.5 z-10 rounded-full bg-card active:scale-97"
-    >
-      <Star className={cn('size-3.5', starred && 'fill-foreground')} />
-    </Button>
   )
 }
 
