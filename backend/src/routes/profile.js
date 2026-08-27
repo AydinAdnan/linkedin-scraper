@@ -29,6 +29,18 @@ function safeDetail(err) {
   return config.isProd ? undefined : err.message;
 }
 
+// COOKIES_EXPIRED/PROFILE_NOT_FOUND/PROFILE_RESTRICTED are routine, expected
+// outcomes — logging them as errors would just be noise. FETCH_FAILED means
+// something we didn't anticipate (LinkedIn shape change, network blip, a bug
+// in our own parsing) — that's the one worth a full stack trace to diagnose.
+function logFetchError(req, err, code, url) {
+  if (code === "FETCH_FAILED") {
+    req.log.error({ err, url }, "unexpected LinkedIn fetch failure");
+  } else {
+    req.log.info({ code, url }, "profile fetch skipped");
+  }
+}
+
 export default async function profileRoutes(app) {
   app.post(
     "/api/profile",
@@ -50,6 +62,7 @@ export default async function profileRoutes(app) {
         return await fetchProfile(req.body.url);
       } catch (err) {
         const code = errorCode(err);
+        logFetchError(req, err, code, req.body.url);
         return reply.code(statusFor(code)).send({ error: code, detail: safeDetail(err) });
       }
     }
@@ -99,6 +112,14 @@ export default async function profileRoutes(app) {
 
       const plan = planBatchRows(rawEntries);
 
+      // reply.hijack() takes this response out of Fastify's normal lifecycle
+      // for streaming, which also means its automatic request/response
+      // logging never fires — log the batch explicitly instead, or it's
+      // invisible in the logs end-to-end.
+      req.log.info({ rows: plan.length }, "batch started");
+      const tally = { ok: 0, error: 0 };
+      const startedAt = Date.now();
+
       activeBatches++;
       reply.hijack();
       reply.raw.writeHead(200, {
@@ -109,18 +130,24 @@ export default async function profileRoutes(app) {
       try {
         for (const item of plan) {
           if (item.error) {
+            tally.error++;
+            logFetchError(req, new Error(item.error), item.error, item.raw);
             reply.raw.write(JSON.stringify({ row: item.row, sourceUrl: item.raw, error: item.error }) + "\n");
             continue;
           }
           try {
             const data = await fetchProfile(item.canonical);
+            tally.ok++;
             reply.raw.write(JSON.stringify({ row: item.row, ...data }) + "\n");
           } catch (err) {
+            tally.error++;
+            const code = errorCode(err);
+            logFetchError(req, err, code, item.canonical);
             reply.raw.write(
               JSON.stringify({
                 row: item.row,
                 sourceUrl: item.raw,
-                error: errorCode(err),
+                error: code,
                 detail: safeDetail(err),
               }) + "\n"
             );
@@ -129,6 +156,7 @@ export default async function profileRoutes(app) {
       } finally {
         activeBatches--;
         reply.raw.end();
+        req.log.info({ ...tally, durationMs: Date.now() - startedAt }, "batch finished");
       }
     }
   );

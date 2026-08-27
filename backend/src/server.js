@@ -37,4 +37,24 @@ app.get("/openapi.json", async () => app.swagger());
 await app.register(authRoutes);
 await app.register(profileRoutes);
 
+// Catches anything a route handler didn't (bad JSON, schema mismatches, an
+// unhandled throw) instead of Fastify's default opaque 500 — logs the real
+// error server-side and only echoes internals back when not in production.
+app.setErrorHandler((err, req, reply) => {
+  req.log.error({ err }, "unhandled route error");
+  reply.code(err.statusCode || 500).send({
+    error: "INTERNAL_ERROR",
+    detail: config.isProd ? undefined : err.message,
+  });
+});
+
+// Without these, a bug that throws outside a request handler (a stray
+// promise rejection, a timer callback) crashes the process with just a raw
+// stack trace on stderr — log it through the same structured logger first.
+process.on("unhandledRejection", (err) => app.log.error({ err }, "unhandled promise rejection"));
+process.on("uncaughtException", (err) => {
+  app.log.fatal({ err }, "uncaught exception, shutting down");
+  process.exit(1);
+});
+
 app.listen({ port: config.port, host: "0.0.0.0" });
