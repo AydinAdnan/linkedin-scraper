@@ -91,10 +91,55 @@ own abuse thresholds. Successful lookups are cached in memory for 1 hour.
 ## Deployment
 
 - **Backend**: `backend/Dockerfile` — build and deploy to any container host
-  (Railway, Fly.io, Render). Set `FRONTEND_URL`, `LI_AT`, `LI_JSESSIONID` as
-  env vars in production (never commit `.env`).
+  (Railway, Fly.io, Render). Set `FRONTEND_URL`, `LI_AT`, `LI_JSESSIONID`,
+  `LI_USER_AGENT`, and **`API_KEY`** as env vars in production (never commit
+  `.env`). Do not deploy without setting `API_KEY` — see Security below.
 - **Frontend**: deploy `frontend/` to Vercel as a static Vite build. Set
-  `VITE_API_URL` to the deployed backend URL.
+  `VITE_API_URL` to the deployed backend URL, and `VITE_API_KEY` to match
+  the backend's `API_KEY`.
+
+## Security
+
+Since this API runs on your personal LinkedIn session, the main risk isn't
+generic web-app vulnerabilities — it's someone else using your session
+without permission. What's in place, and what isn't:
+
+- **API key gate** (`API_KEY` / `x-api-key` header): required on every
+  `/api/*` route once set. **Caveat:** the frontend's copy of the key
+  (`VITE_API_KEY`) is baked into the built JS bundle and readable by anyone
+  who opens devtools — this stops casual/automated hits directly on the bare
+  API URL, it is not a real secret against a motivated visitor of your own
+  frontend. A proper fix would put a backend-for-frontend in front of it with
+  per-session auth, which is out of scope for this assignment.
+- **CORS** locked to `FRONTEND_URL` — stops other websites' JS from calling
+  the API from a victim's browser, but does nothing against direct
+  curl/Postman requests (CORS is a browser-enforced policy, not a server
+  one) — the API key is what covers that gap.
+- **Per-IP rate limiting** (`@fastify/rate-limit`) plus a cap of 3 concurrent
+  batch-upload requests, so a handful of large batches can't exhaust server
+  connections/memory. `trustProxy: true` is set so this reflects real client
+  IPs behind a reverse proxy instead of the proxy's own IP.
+- **`@fastify/helmet`** for standard security headers (HSTS, X-Frame-Options,
+  X-Content-Type-Options, etc).
+- **Error responses are sanitized in production** (`NODE_ENV=production`,
+  set by the Dockerfile) — internal error text (axios/Node messages) is only
+  included in non-production responses, so a public deployment doesn't leak
+  implementation details in error bodies.
+- **Swagger UI at `/docs` is public** by design (useful for evaluators to see
+  the API), gated by the same `@fastify/helmet`/CORS/rate-limit stack as
+  everything else, not additionally locked down.
+- **Dependency scanning**: `npm audit` is clean (a transitive high-severity
+  path-traversal advisory in `@fastify/static`, pulled in via
+  `@fastify/swagger-ui`, was fixed by upgrading `@fastify/swagger-ui`).
+- **Debug dumps** (`debug-last-profile.json`, containing real scraped profile
+  data) only ever get written when `NODE_ENV !== "production"` — the
+  Dockerfile sets `NODE_ENV=production` so this never happens in a deployed
+  container.
+- **Not covered / accepted risk for this assignment**: no WAF/DDoS layer
+  (rely on the hosting platform's), no audit logging of who queried what, no
+  per-key usage quotas beyond the global rate limit, and — as covered
+  earlier — no durable fix for LinkedIn eventually flagging the session
+  regardless of these protections.
 
 ## Known limitations
 

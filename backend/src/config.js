@@ -1,8 +1,13 @@
 import "dotenv/config";
 
 export const config = {
+  isProd: process.env.NODE_ENV === "production",
   port: Number(process.env.PORT) || 4000,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  // If set, every /api/* request must send this in x-api-key. Without it the
+  // API is open to the internet and anyone can burn your LinkedIn session —
+  // set this before deploying anywhere public.
+  apiKey: process.env.API_KEY || "",
   liAt: process.env.LI_AT || "",
   jsessionid: process.env.LI_JSESSIONID || "",
   // Must match the browser `npm run login` actually used — LinkedIn treats a

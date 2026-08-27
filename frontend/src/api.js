@@ -1,11 +1,16 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+// NOTE: a build-time env var ends up readable in the shipped JS bundle, so
+// this only deters casual/automated hits directly on the API — it is not a
+// real secret. See README "known limitations".
+const API_KEY = import.meta.env.VITE_API_KEY || ''
+const authHeaders = API_KEY ? { 'x-api-key': API_KEY } : {}
 
 export class SessionExpiredError extends Error {}
 
 async function post(path, body) {
   const res = await fetch(BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
@@ -21,14 +26,14 @@ export const fetchProfile = (url) => post('/api/profile', { url })
 // the csv/txt) or { urls } (JSON array).
 export async function streamBatch(input, onRow) {
   const opts = input.file
-    ? { method: 'POST', body: (() => {
+    ? { method: 'POST', headers: authHeaders, body: (() => {
         const fd = new FormData()
         fd.append('file', input.file)
         return fd
       })() }
     : {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ urls: input.urls }),
       }
 

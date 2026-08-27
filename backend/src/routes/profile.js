@@ -3,9 +3,19 @@ import { CookiesExpiredError } from "../lib/voyagerClient.js";
 import { normalizeProfileUrl } from "../lib/validateUrl.js";
 import { parseBatchInput, MAX_ROWS } from "../lib/parseBatchInput.js";
 import { planBatchRows } from "../lib/planBatch.js";
+import { config } from "../config.js";
+
+const MAX_CONCURRENT_BATCHES = 3;
+let activeBatches = 0;
 
 function errorCode(err) {
   return err instanceof CookiesExpiredError ? "COOKIES_EXPIRED" : "FETCH_FAILED";
+}
+
+// Don't echo raw error internals to callers in production — keep them for
+// local debugging, where seeing the real axios/Node error speeds things up.
+function safeDetail(err) {
+  return config.isProd ? undefined : err.message;
 }
 
 export default async function profileRoutes(app) {
@@ -29,7 +39,7 @@ export default async function profileRoutes(app) {
         return await fetchProfile(req.body.url);
       } catch (err) {
         const code = errorCode(err);
-        return reply.code(code === "COOKIES_EXPIRED" ? 401 : 502).send({ error: code, detail: err.message });
+        return reply.code(code === "COOKIES_EXPIRED" ? 401 : 502).send({ error: code, detail: safeDetail(err) });
       }
     }
   );
@@ -45,6 +55,15 @@ export default async function profileRoutes(app) {
       },
     },
     async (req, reply) => {
+      // Every request already queues behind the same single-lane LinkedIn
+      // request queue, so this isn't about LinkedIn load — it caps how many
+      // long-lived streaming connections (and pending profile lists) this
+      // process holds open at once, so a handful of concurrent batch uploads
+      // can't exhaust server memory/file descriptors.
+      if (activeBatches >= MAX_CONCURRENT_BATCHES) {
+        return reply.code(429).send({ error: "Too many batch requests in progress, try again shortly" });
+      }
+
       let rawEntries;
 
       if (req.isMultipart()) {
@@ -69,27 +88,37 @@ export default async function profileRoutes(app) {
 
       const plan = planBatchRows(rawEntries);
 
+      activeBatches++;
       reply.hijack();
       reply.raw.writeHead(200, {
         "Content-Type": "application/x-ndjson",
         "Cache-Control": "no-cache",
       });
 
-      for (const item of plan) {
-        if (item.error) {
-          reply.raw.write(JSON.stringify({ row: item.row, sourceUrl: item.raw, error: item.error }) + "\n");
-          continue;
+      try {
+        for (const item of plan) {
+          if (item.error) {
+            reply.raw.write(JSON.stringify({ row: item.row, sourceUrl: item.raw, error: item.error }) + "\n");
+            continue;
+          }
+          try {
+            const data = await fetchProfile(item.canonical);
+            reply.raw.write(JSON.stringify({ row: item.row, ...data }) + "\n");
+          } catch (err) {
+            reply.raw.write(
+              JSON.stringify({
+                row: item.row,
+                sourceUrl: item.raw,
+                error: errorCode(err),
+                detail: safeDetail(err),
+              }) + "\n"
+            );
+          }
         }
-        try {
-          const data = await fetchProfile(item.canonical);
-          reply.raw.write(JSON.stringify({ row: item.row, ...data }) + "\n");
-        } catch (err) {
-          reply.raw.write(
-            JSON.stringify({ row: item.row, sourceUrl: item.raw, error: errorCode(err), detail: err.message }) + "\n"
-          );
-        }
+      } finally {
+        activeBatches--;
+        reply.raw.end();
       }
-      reply.raw.end();
     }
   );
 }
