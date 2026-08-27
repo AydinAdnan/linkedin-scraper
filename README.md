@@ -86,4 +86,5 @@ Paste the output into both Railway's `API_KEY` and Vercel's `VITE_API_KEY`.
 - One shared LinkedIn account behind the API — no per-user LinkedIn login, no multi-account support.
 - `API_KEY` shipped to a public frontend bundle deters casual abuse but isn't a true secret against someone inspecting the frontend's network calls.
 - Only fields visible to the logged-in account are returned; private/restricted profile sections are omitted.
+- `PROFILE_NOT_FOUND` vs `PROFILE_RESTRICTED` is best-effort: LinkedIn sometimes 403s a nonexistent username instead of 404ing it (likely deliberate, to prevent enumeration attacks), so "restricted" doesn't always mean the profile is confirmed private.
 - Batch capped at 50 rows / 1 MB per request.

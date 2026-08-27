@@ -1,7 +1,7 @@
 import { writeFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import { voyagerClient, ProfileRestrictedError } from "../lib/voyagerClient.js";
+import { voyagerClient, ProfileNotFoundError, ProfileRestrictedError } from "../lib/voyagerClient.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { enqueue } from "../lib/queue.js";
 import { normalizeProfileUrl } from "../lib/validateUrl.js";
@@ -132,11 +132,15 @@ async function fetchProfileUncached(url) {
   }
 
   const parsed = parseProfileView(data);
-  // LinkedIn doesn't always 403 a restricted profile — a private/out-of-network
-  // profile can come back as a 200 with no usable profile entity at all.
-  // Treat "no name" the same as an explicit restriction rather than returning
-  // an empty-looking success.
-  if (!parsed.name) throw new ProfileRestrictedError();
+  if (!parsed.name) {
+    // The top-level response is a Rest.li CollectionResponse — `*elements`
+    // is the list of matched entity URNs. Empty means the memberIdentity
+    // lookup matched nothing at all (nonexistent username). A non-empty list
+    // whose entity still didn't resolve to a usable profile means it exists
+    // but is private/out-of-network and LinkedIn just didn't 403 it.
+    const elements = data.data?.["*elements"] || data.data?.elements || [];
+    throw elements.length === 0 ? new ProfileNotFoundError() : new ProfileRestrictedError();
+  }
 
   return { sourceUrl: url, ...parsed };
 }

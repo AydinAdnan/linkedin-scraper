@@ -20,11 +20,14 @@ export class ProfileNotFoundError extends Error {
   }
 }
 
-// Profile exists but its data isn't visible to this account (private,
-// out-of-network restricted, memorialized, etc) — also never worth retrying.
+// LinkedIn returned 403 (or a 200 with a matched-but-empty profile). This
+// usually means private/out-of-network — but LinkedIn also 403s some
+// nonexistent usernames instead of 404ing them (likely deliberate, to stop
+// enumeration attacks), so treat this as "not accessible" rather than a
+// confirmed "this profile is private." Never worth retrying either way.
 export class ProfileRestrictedError extends Error {
   constructor() {
-    super("This profile's details aren't visible to the logged-in account.");
+    super("This profile isn't accessible to the logged-in account (private, or may not exist).");
     this.statusCode = 403;
   }
 }

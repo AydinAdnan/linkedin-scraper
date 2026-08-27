@@ -2,9 +2,13 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, TriangleAlert } from 'lucide-react'
 
+// LinkedIn often 403s a lookup for both a nonexistent AND a private profile
+// (likely deliberate — it stops enumeration attacks that watch for 404 vs
+// 403 to guess valid usernames), so RESTRICTED doesn't always mean "private"
+// specifically — see README "known limitations".
 const LABELS = {
   PROFILE_NOT_FOUND: 'Not found',
-  PROFILE_RESTRICTED: 'Private / restricted',
+  PROFILE_RESTRICTED: 'Not accessible',
 }
 
 // Collapsed by default — profiles that don't exist or aren't visible are
