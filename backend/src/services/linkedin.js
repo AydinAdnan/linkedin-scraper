@@ -31,10 +31,14 @@ function findProfile(included) {
 }
 
 function resolveImage(picture) {
-  const root = picture?.["com.linkedin.common.VectorImage"];
-  const artifact = root?.artifacts?.at(-1);
-  if (!root || !artifact) return null;
-  return `${root.rootUrl}${artifact.fileIdentifyingUrlPathSegment}`;
+  // Newer dash endpoint nests it under displayImageReference.vectorImage;
+  // classic profileView embedded it directly — accept either.
+  const root = picture?.displayImageReference?.vectorImage || picture?.["com.linkedin.common.VectorImage"];
+  const artifacts = root?.artifacts || [];
+  // Artifacts aren't sorted by size — pick the largest so we don't grab a thumbnail.
+  const biggest = artifacts.reduce((a, b) => ((b.width || 0) > (a?.width || 0) ? b : a), null);
+  if (!root || !biggest) return null;
+  return `${root.rootUrl}${biggest.fileIdentifyingUrlPathSegment}`;
 }
 
 // Old profileView used `timePeriod: { startDate, endDate }`, the newer dash
@@ -103,6 +107,12 @@ async function fetchProfileUncached(url) {
       q: "memberIdentity",
       memberIdentity: publicId,
       decorationId: config.profileDecorationId,
+    },
+    headers: {
+      referer: `https://www.linkedin.com/in/${publicId}/`,
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin",
+      "sec-fetch-dest": "empty",
     },
   });
 

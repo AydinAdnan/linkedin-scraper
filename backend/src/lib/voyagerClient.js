@@ -19,6 +19,12 @@ export function voyagerClient() {
 
   const client = axios.create({
     baseURL: "https://www.linkedin.com/voyager/api",
+    // Don't blindly follow redirects — LinkedIn bounces flagged/expired
+    // sessions to a login or checkpoint page, and axios would otherwise loop
+    // until "Maximum number of redirects exceeded" burns 10+ seconds with no
+    // useful error. Treat any redirect as a dead session instead.
+    maxRedirects: 0,
+    validateStatus: (status) => status < 300,
     headers: {
       cookie: `li_at=${config.liAt}; JSESSIONID="${config.jsessionid}"`,
       "csrf-token": config.jsessionid,
@@ -33,7 +39,8 @@ export function voyagerClient() {
   client.interceptors.response.use(
     (res) => res,
     (err) => {
-      if (err.response?.status === 401 || err.response?.status === 999) {
+      const status = err.response?.status;
+      if (status === 401 || status === 999 || (status >= 300 && status < 400)) {
         throw new CookiesExpiredError();
       }
       throw err;
