@@ -26,19 +26,20 @@ about, experience, education, skills, certifications, languages, images).
 
 ## API
 
-| Method | Path | Body | Notes |
-|---|---|---|---|
-| GET | `/health` | — | liveness check |
-| GET | `/openapi.json` | — | raw OpenAPI 3 spec |
-| GET | `/docs` | — | Swagger UI |
-| GET | `/auth/status` | — | `{ loggedIn: boolean }` |
-| POST | `/api/profile` | `{ "url": "..." }` | single profile **or** company (auto-detected) |
-| POST | `/api/profile/batch` | `{ "urls": [...] }` **or** multipart file | streams NDJSON, one row per line; profile/company URLs can be mixed freely |
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| GET | `/health` | none | — | `200 { ok: true }` |
+| GET | `/openapi.json` | none | — | `200` raw OpenAPI 3 spec |
+| GET | `/docs` | none | — | `200` Swagger UI |
+| GET | `/auth/status` | none | — | `200 { loggedIn: boolean }` |
+| POST | `/api/profile` | `x-api-key`* | `{ "url": "..." }` | `200` profile/company JSON, `400/401/403/404/502` on error |
+| POST | `/api/profile/batch` | `x-api-key`* | `{ "urls": [...] }` **or** multipart file | `200` streamed NDJSON (one row per line, mixed profile/company OK), `400/429` on request-level error |
+
+\* required only if `API_KEY` is set.
 
 - Accepted URLs: `https://[locale.]linkedin.com/in/{id}` (profile) or `.../company/{id}` (company) only — other paths rejected. Response includes `type: "profile" | "company"`.
 - Batch file: `.txt` (one URL per line, or comma-separated) or `.csv` (`url`/`profile_url`/`linkedin_url`/`company_url` column, or first column) — max 1 MB, max 50 rows.
-- Row-level errors instead of failing the batch: `INVALID_LINKEDIN_URL`, `DUPLICATE_URL`, `COOKIES_EXPIRED`, `FETCH_FAILED`.
-- All `/api/*` routes require an `x-api-key` header if `API_KEY` is set.
+- Row-level errors instead of failing the batch: `INVALID_LINKEDIN_URL`, `DUPLICATE_URL`, `COOKIES_EXPIRED`, `PROFILE_NOT_FOUND`, `PROFILE_RESTRICTED`, `FETCH_FAILED`.
 
 ## Approach
 
