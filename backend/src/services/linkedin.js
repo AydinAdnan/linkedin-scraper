@@ -1,11 +1,12 @@
 import { voyagerClient } from "../lib/voyagerClient.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { enqueue } from "../lib/queue.js";
+import { normalizeProfileUrl } from "../lib/validateUrl.js";
 
 export function extractPublicIdentifier(url) {
-  const match = url.match(/linkedin\.com\/in\/([^/?#]+)/i);
-  if (!match) throw new Error("Not a valid LinkedIn profile URL");
-  return match[1];
+  const canonical = normalizeProfileUrl(url);
+  if (!canonical) throw new Error("Not a valid LinkedIn profile URL");
+  return canonical.split("/in/")[1];
 }
 
 // Voyager responses are a flat `included` array of typed entities linked by
@@ -81,10 +82,13 @@ async function fetchProfileUncached(url) {
 }
 
 export async function fetchProfile(url) {
-  const cached = cacheGet(url);
+  const canonical = normalizeProfileUrl(url);
+  if (!canonical) throw new Error("Not a valid LinkedIn profile URL");
+
+  const cached = cacheGet(canonical);
   if (cached) return cached;
 
-  const result = await enqueue(() => fetchProfileUncached(url));
-  cacheSet(url, result);
+  const result = await enqueue(() => fetchProfileUncached(canonical));
+  cacheSet(canonical, result);
   return result;
 }
