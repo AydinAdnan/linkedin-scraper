@@ -36,7 +36,7 @@ about, experience, education, skills, certifications, languages, images).
 | POST | `/api/profile/batch` | `{ "urls": [...] }` **or** multipart file | streams NDJSON, one row per line |
 
 - Accepted URLs: `https://[locale.]linkedin.com/in/{id}` only (e.g. `www.`, `in.`, `uk.` — company pages/other paths rejected).
-- Batch file: `.txt` (one URL/line) or `.csv` (`url`/`profile_url`/`linkedin_url` column, or first column) — max 1 MB, max 50 rows.
+- Batch file: `.txt` (one URL per line, or comma-separated) or `.csv` (`url`/`profile_url`/`linkedin_url` column, or first column) — max 1 MB, max 50 rows.
 - Row-level errors instead of failing the batch: `INVALID_PROFILE_URL`, `DUPLICATE_URL`, `COOKIES_EXPIRED`, `FETCH_FAILED`.
 - All `/api/*` routes require an `x-api-key` header if `API_KEY` is set.
 

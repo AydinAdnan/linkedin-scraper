@@ -11,9 +11,11 @@ export class BatchInputError extends Error {
   }
 }
 
+// Accepts either one URL per line, or comma-separated URLs (LinkedIn URLs
+// never contain commas, so splitting on either delimiter is unambiguous).
 function fromTxt(text) {
   return text
-    .split(/\r\n|\r|\n/)
+    .split(/[\r\n,]+/)
     .map((line) => line.trim())
     .filter(Boolean);
 }
