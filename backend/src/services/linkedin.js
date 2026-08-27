@@ -41,11 +41,17 @@ function resolveImage(picture) {
   return `${root.rootUrl}${biggest.fileIdentifyingUrlPathSegment}`;
 }
 
+// Strip to just { month, year } — LinkedIn's raw date objects carry their
+// own internal $type/$recipeTypes metadata we don't want leaking into our schema.
+function cleanDate(d) {
+  return d?.year ? { month: d.month ?? null, year: d.year } : null;
+}
+
 // Old profileView used `timePeriod: { startDate, endDate }`, the newer dash
 // endpoint uses `dateRange: { start, end }` — accept either.
 function dateRange(entity) {
   const range = entity.timePeriod || entity.dateRange;
-  return { start: range?.startDate || range?.start || null, end: range?.endDate || range?.end || null };
+  return { start: cleanDate(range?.startDate || range?.start), end: cleanDate(range?.endDate || range?.end) };
 }
 
 function parseProfileView(raw) {
