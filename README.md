@@ -32,12 +32,12 @@ about, experience, education, skills, certifications, languages, images).
 | GET | `/openapi.json` | — | raw OpenAPI 3 spec |
 | GET | `/docs` | — | Swagger UI |
 | GET | `/auth/status` | — | `{ loggedIn: boolean }` |
-| POST | `/api/profile` | `{ "url": "..." }` | single profile |
-| POST | `/api/profile/batch` | `{ "urls": [...] }` **or** multipart file | streams NDJSON, one row per line |
+| POST | `/api/profile` | `{ "url": "..." }` | single profile **or** company (auto-detected) |
+| POST | `/api/profile/batch` | `{ "urls": [...] }` **or** multipart file | streams NDJSON, one row per line; profile/company URLs can be mixed freely |
 
-- Accepted URLs: `https://[locale.]linkedin.com/in/{id}` only (e.g. `www.`, `in.`, `uk.` — company pages/other paths rejected).
-- Batch file: `.txt` (one URL per line, or comma-separated) or `.csv` (`url`/`profile_url`/`linkedin_url` column, or first column) — max 1 MB, max 50 rows.
-- Row-level errors instead of failing the batch: `INVALID_PROFILE_URL`, `DUPLICATE_URL`, `COOKIES_EXPIRED`, `FETCH_FAILED`.
+- Accepted URLs: `https://[locale.]linkedin.com/in/{id}` (profile) or `.../company/{id}` (company) only — other paths rejected. Response includes `type: "profile" | "company"`.
+- Batch file: `.txt` (one URL per line, or comma-separated) or `.csv` (`url`/`profile_url`/`linkedin_url`/`company_url` column, or first column) — max 1 MB, max 50 rows.
+- Row-level errors instead of failing the batch: `INVALID_LINKEDIN_URL`, `DUPLICATE_URL`, `COOKIES_EXPIRED`, `FETCH_FAILED`.
 - All `/api/*` routes require an `x-api-key` header if `API_KEY` is set.
 
 ## Approach
@@ -46,6 +46,7 @@ about, experience, education, skills, certifications, languages, images).
 - One-time Playwright login script lifts `li_at`/`JSESSIONID`/User-Agent from a real browser session into `.env`.
 - Requests are queued one-at-a-time with randomized delay, and cached for an hour, to reduce load on LinkedIn and avoid tripping its bot detection.
 - Entity parsing matches LinkedIn's response `$type` fields by substring (not exact match) so it tolerates LinkedIn renaming fields between rollouts.
+- Profiles and companies use entirely different Voyager endpoints and response schemas (`backend/src/services/linkedin.js` vs `company.js`) — URL type is detected up front and each is fetched/parsed/rendered separately rather than forcing one schema onto both.
 
 ## Deployment
 
@@ -54,7 +55,7 @@ about, experience, education, skills, certifications, languages, images).
 - `API_KEY` — see "Generating a secret key"
 - `FRONTEND_URL` — your deployed Vercel URL
 - `PORT` — Railway sets this automatically, no action needed
-- Optional: `RATE_LIMIT_MAX`, `REQUEST_DELAY_MS`, `PROFILE_DECORATION_ID`
+- Optional: `RATE_LIMIT_MAX`, `REQUEST_DELAY_MS`, `PROFILE_DECORATION_ID`, `COMPANY_DECORATION_ID`
 
 **Vercel (frontend) env vars**
 - `VITE_API_URL` — your deployed Railway URL
@@ -83,6 +84,7 @@ Paste the output into both Railway's `API_KEY` and Vercel's `VITE_API_KEY`.
 - LinkedIn session (`li_at`) can get flagged and expire well before its normal ~1yr lifetime if traffic looks automated — expect to re-run `npm run login` periodically.
 - Rate limited by design (`RATE_LIMIT_MAX`/min per IP, 1 request in flight to LinkedIn at a time, max 3 concurrent batch uploads) — this is intentional, not a bug, to avoid getting the account banned.
 - Depends on undocumented LinkedIn internals (`decorationId`, entity field names) that can change without notice.
+- Company data comes from the default (undecorated) `organization/companies` response, verified against real company pages — it doesn't have a proper "website" field, so `website` is LinkedIn's own "Learn more" call-to-action link (usually the real site, but not guaranteed). Setting `COMPANY_DECORATION_ID` to a specific decoration might expose more fields but hasn't been found/verified.
 - One shared LinkedIn account behind the API — no per-user LinkedIn login, no multi-account support.
 - `API_KEY` shipped to a public frontend bundle deters casual abuse but isn't a true secret against someone inspecting the frontend's network calls.
 - Only fields visible to the logged-in account are returned; private/restricted profile sections are omitted.

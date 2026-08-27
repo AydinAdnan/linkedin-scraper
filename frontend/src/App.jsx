@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import SearchBar from '@/components/SearchBar'
 import Passport from '@/components/Passport'
+import CompanyCard from '@/components/CompanyCard'
 import ExportMenu from '@/components/ExportMenu'
 import HazardBanner from '@/components/HazardBanner'
 import CarouselNav from '@/components/CarouselNav'
@@ -199,7 +200,7 @@ export default function App() {
             >
               <h1 className="text-3xl font-semibold tracking-tight">LinkedIn Profile API</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Paste a profile URL, or attach a .csv / .txt of up to 50 of them.
+                Paste a profile or company URL, or attach a .csv / .txt of up to 50 of them.
               </p>
             </motion.div>
           )}
@@ -259,11 +260,19 @@ export default function App() {
                       exit={{ opacity: 0, x: reduced ? 0 : -24 * direction, filter: reduced ? 'none' : 'blur(8px)' }}
                       transition={{ duration: reduced ? 0 : 0.3, ease: [0.23, 1, 0.32, 1] }}
                     >
-                      <Passport
-                        profile={results[activeIndex]}
-                        starred={starred.has(rowKey(results[activeIndex]))}
-                        onToggleStar={() => toggleStar(rowKey(results[activeIndex]))}
-                      />
+                      {results[activeIndex].type === 'company' ? (
+                        <CompanyCard
+                          profile={results[activeIndex]}
+                          starred={starred.has(rowKey(results[activeIndex]))}
+                          onToggleStar={() => toggleStar(rowKey(results[activeIndex]))}
+                        />
+                      ) : (
+                        <Passport
+                          profile={results[activeIndex]}
+                          starred={starred.has(rowKey(results[activeIndex]))}
+                          onToggleStar={() => toggleStar(rowKey(results[activeIndex]))}
+                        />
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -11,12 +11,15 @@ function range(start, end) {
   return `${from} - ${fmtDate(end) || 'Present'}`
 }
 
-const COLUMNS = ['name', 'headline', 'location', 'about', 'skills', 'experience', 'education', 'certifications', 'languages', 'sourceUrl', 'error']
+// Union of profile + company fields — a batch export can contain both, so
+// each row just leaves the columns that don't apply to its type blank.
+const COLUMNS = [
+  'type', 'name', 'headline', 'location', 'about', 'skills', 'experience', 'education',
+  'certifications', 'languages', 'industry', 'staffCount', 'headquarters', 'website',
+  'founded', 'followerCount', 'specialties', 'sourceUrl', 'error',
+]
 
-function rowToRecord(profile) {
-  if (profile.error) {
-    return { sourceUrl: profile.sourceUrl || '', error: profile.error }
-  }
+function profileRecord(profile) {
   const experience = (profile.experience || [])
     .map((e) => [e.title, e.company, range(e.startDate, e.endDate)].filter(Boolean).join(', '))
     .join(' ; ')
@@ -38,9 +41,31 @@ function rowToRecord(profile) {
     education,
     certifications,
     languages,
-    sourceUrl: profile.sourceUrl || '',
-    error: '',
   }
+}
+
+function companyRecord(profile) {
+  return {
+    name: profile.name || '',
+    headline: profile.tagline || '',
+    location: profile.headquarters || '',
+    about: profile.about || '',
+    industry: profile.industry || '',
+    staffCount: profile.staffCount ?? '',
+    headquarters: profile.headquarters || '',
+    website: profile.website || '',
+    founded: profile.founded ?? '',
+    followerCount: profile.followerCount ?? '',
+    specialties: (profile.specialties || []).join('; '),
+  }
+}
+
+function rowToRecord(profile) {
+  if (profile.error) {
+    return { type: profile.type || '', sourceUrl: profile.sourceUrl || '', error: profile.error }
+  }
+  const fields = profile.type === 'company' ? companyRecord(profile) : profileRecord(profile)
+  return { type: profile.type || 'profile', ...fields, sourceUrl: profile.sourceUrl || '', error: '' }
 }
 
 function escapeCell(value) {
