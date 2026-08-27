@@ -72,6 +72,12 @@ Paste the output into both Railway's `API_KEY` and Vercel's `VITE_API_KEY`.
 - From then on, every API call — from anyone hitting the deployed URL — is made using your LinkedIn account's session. There's no per-user login; it's one shared account behind the API.
 - When that session gets flagged/expires, repeat: log in locally again, update the three Railway env vars, redeploy/restart.
 
+## Possible future direction
+
+- Current auth is one shared operator account's cookies (`li_at`/`JSESSIONID`) behind the whole API.
+- Could be swapped for per-user LinkedIn OAuth ("Sign in with LinkedIn") instead, so each user authenticates with their own account rather than riding on the operator's session.
+- **Caveat**: official LinkedIn OAuth scopes only grant access to the *authenticated user's own* profile — not arbitrary third-party lookups. Swapping to OAuth would change the product to "log in and fetch your own profile," not "look up anyone's URL," unless paired with a LinkedIn Partner API (Talent/Recruiter), which requires LinkedIn's approval.
+
 ## Known limitations
 
 - LinkedIn session (`li_at`) can get flagged and expire well before its normal ~1yr lifetime if traffic looks automated — expect to re-run `npm run login` periodically.
