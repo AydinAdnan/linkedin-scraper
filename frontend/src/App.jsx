@@ -4,9 +4,13 @@ import { AlertTriangle } from 'lucide-react'
 import SearchBar from '@/components/SearchBar'
 import Passport from '@/components/Passport'
 import ExportMenu from '@/components/ExportMenu'
+import HazardBanner from '@/components/HazardBanner'
 import { Skeleton } from '@/components/ui/skeleton'
-import { authStatus, fetchProfile, streamBatch, SessionExpiredError } from '@/api'
+import { authStatus, fetchProfile, streamBatch, SessionExpiredError, ApiError } from '@/api'
 import { cn } from '@/lib/utils'
+
+// Dead ends — never worth showing as a result card, just a quiet heads-up.
+const UNAVAILABLE_CODES = new Set(['PROFILE_NOT_FOUND', 'PROFILE_RESTRICTED'])
 
 const SESSION_MSG = 'Backend session expired. Ask the admin to re-login on the server.'
 const STARRED_KEY = 'starredProfiles'
@@ -74,13 +78,14 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [results, setResults] = useState([])
+  const [unavailable, setUnavailable] = useState([])
   const [error, setError] = useState('')
   const [loggedIn, setLoggedIn] = useState(true)
   const [starred, setStarred] = useState(loadStarred)
 
   const reduced = useReducedMotion()
   const spring = reduced ? { duration: 0 } : { type: 'spring', duration: 0.55, bounce: 0.12 }
-  const active = busy || results.length > 0
+  const active = busy || results.length > 0 || unavailable.length > 0
 
   useEffect(() => {
     authStatus()
@@ -105,16 +110,29 @@ export default function App() {
     setBusy(true)
     setError('')
     setResults([])
+    setUnavailable([])
     try {
       if (file) {
         setStreaming(true)
-        await streamBatch({ file }, (row) => setResults((r) => [...r, row]))
+        await streamBatch({ file }, (row) => {
+          if (UNAVAILABLE_CODES.has(row.error)) {
+            setUnavailable((u) => [...u, { url: row.sourceUrl, reason: row.error }])
+          } else {
+            setResults((r) => [...r, row])
+          }
+        })
       } else {
         const data = await fetchProfile(url.trim())
         setResults([{ row: 0, ...data }])
       }
     } catch (e) {
-      setError(e instanceof SessionExpiredError ? SESSION_MSG : e.message)
+      if (e instanceof SessionExpiredError) {
+        setError(SESSION_MSG)
+      } else if (e instanceof ApiError && UNAVAILABLE_CODES.has(e.code)) {
+        setUnavailable([{ url: url.trim(), reason: e.code }])
+      } else {
+        setError(e.message)
+      }
     } finally {
       setBusy(false)
       setStreaming(false)
@@ -172,6 +190,7 @@ export default function App() {
               <Notice key="auth">No LinkedIn session on the backend — requests will fail until the admin logs in.</Notice>
             )}
           </AnimatePresence>
+          <HazardBanner items={unavailable} />
         </div>
       </motion.div>
 

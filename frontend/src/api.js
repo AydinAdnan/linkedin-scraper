@@ -7,6 +7,15 @@ const authHeaders = API_KEY ? { 'x-api-key': API_KEY } : {}
 
 export class SessionExpiredError extends Error {}
 
+// Carries the machine-readable error code (PROFILE_NOT_FOUND, PROFILE_RESTRICTED, ...)
+// so callers can branch on it instead of parsing message text.
+export class ApiError extends Error {
+  constructor(code, message) {
+    super(message || code)
+    this.code = code
+  }
+}
+
 async function post(path, body) {
   const res = await fetch(BASE + path, {
     method: 'POST',
@@ -15,7 +24,7 @@ async function post(path, body) {
   })
   const data = await res.json().catch(() => ({}))
   if (res.status === 401) throw new SessionExpiredError(data.error || 'Session expired')
-  if (!res.ok) throw new Error(data.detail || data.error || data.message || `Request failed (${res.status})`)
+  if (!res.ok) throw new ApiError(data.error, data.detail || data.error || data.message || `Request failed (${res.status})`)
   return data
 }
 
