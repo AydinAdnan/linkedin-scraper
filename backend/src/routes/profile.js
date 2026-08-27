@@ -122,9 +122,15 @@ export default async function profileRoutes(app) {
 
       activeBatches++;
       reply.hijack();
+      // reply.hijack() bypasses Fastify's whole send pipeline, including the
+      // hook @fastify/cors normally uses to add Access-Control-Allow-Origin —
+      // without setting it here by hand, the browser receives a real 200 but
+      // blocks it from reaching JS ("Failed to fetch"), since it's missing.
       reply.raw.writeHead(200, {
         "Content-Type": "application/x-ndjson",
         "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": config.frontendUrl,
+        Vary: "Origin",
       });
 
       try {
