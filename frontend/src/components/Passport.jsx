@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion'
-import { AlertTriangle, MapPin, Star } from 'lucide-react'
+import { AlertTriangle, ExternalLink, MapPin, Star } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MAX_ENTRIES = 3
+const MAX_SKILLS = 8
 
 function fmtDate(d) {
   if (!d?.year) return null
@@ -15,16 +17,16 @@ function fmtDate(d) {
 function range(start, end) {
   const from = fmtDate(start)
   if (!from) return null
-  return `${from} — ${fmtDate(end) || 'Present'}`
+  return `${from}–${fmtDate(end) || 'Present'}`
 }
 
 function Section({ label, span, children }) {
   return (
     <motion.section
-      variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
+      variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }}
       className={span ? 'md:col-span-2' : ''}
     >
-      <h3 className="mb-3 border-b pb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+      <h3 className="mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </h3>
       {children}
@@ -32,17 +34,19 @@ function Section({ label, span, children }) {
   )
 }
 
-function Entry({ title, subtitle, meta, description }) {
+function Entry({ title, subtitle, meta }) {
   return (
-    <li className="border-l pl-4">
-      <p className="text-sm font-medium leading-snug">{title || '—'}</p>
-      {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-      {meta && <p className="mt-0.5 font-mono text-[11px] tracking-wide text-muted-foreground">{meta}</p>}
-      {description && (
-        <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{description}</p>
-      )}
+    <li className="border-l pl-2.5">
+      <p className="truncate text-xs font-medium leading-tight">{title || '—'}</p>
+      {subtitle && <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>}
+      {meta && <p className="font-mono text-[10px] tracking-wide text-muted-foreground">{meta}</p>}
     </li>
   )
+}
+
+function More({ count }) {
+  if (count <= 0) return null
+  return <p className="pl-2.5 text-[10px] text-muted-foreground">+{count} more</p>
 }
 
 function StarButton({ starred, onToggle }) {
@@ -54,22 +58,22 @@ function StarButton({ starred, onToggle }) {
       onClick={onToggle}
       aria-pressed={starred}
       aria-label={starred ? 'Unstar profile' : 'Star profile'}
-      className="absolute right-3 top-3 z-10 rounded-full bg-card/90 backdrop-blur active:scale-97"
+      className="absolute right-2.5 top-2.5 z-10 rounded-full bg-card active:scale-97"
     >
-      <Star className={cn('size-4', starred && 'fill-foreground')} />
+      <Star className={cn('size-3.5', starred && 'fill-foreground')} />
     </Button>
   )
 }
 
 export default function Passport({ profile, starred, onToggleStar }) {
-  const shell = 'relative overflow-hidden rounded-2xl border bg-card shadow-sm'
+  const shell = 'relative mx-auto w-full max-w-xl overflow-hidden rounded-xl border bg-card shadow-sm'
 
   if (profile.error) {
     return (
       <div className={shell}>
         <StarButton starred={starred} onToggle={onToggleStar} />
-        <div className="flex flex-col items-center gap-3 px-8 py-16 text-center">
-          <AlertTriangle className="size-6 text-destructive" />
+        <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
+          <AlertTriangle className="size-5 text-destructive" />
           <p className="text-sm font-medium">Couldn't fetch this profile</p>
           <p className="max-w-md break-all text-xs text-muted-foreground">{profile.sourceUrl}</p>
           <p className="max-w-md text-xs text-muted-foreground">{profile.error}</p>
@@ -83,131 +87,122 @@ export default function Passport({ profile, starred, onToggleStar }) {
   return (
     <div className={shell}>
       <StarButton starred={starred} onToggle={onToggleStar} />
-      <div className="h-28 bg-gradient-to-br from-muted to-accent">
-        {profile.bannerImage && (
-          <img src={profile.bannerImage} alt="" className="size-full object-cover" />
-        )}
-      </div>
 
-      <div className="px-8 pb-8">
-        <div className="-mt-12 flex flex-wrap items-end gap-5">
-          <Avatar className="size-24 rounded-xl border-4 border-card shadow-sm">
-            <AvatarImage src={profile.profileImage || undefined} alt={profile.name} className="object-cover" />
-            <AvatarFallback className="rounded-xl text-xl">{profile.name?.[0] || '?'}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 pb-1">
-            <h2 className="truncate text-2xl font-semibold tracking-tight">{profile.name}</h2>
-            {profile.headline && (
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{profile.headline}</p>
-            )}
+      <div className="flex items-start gap-3 border-b p-4 pr-12">
+        <Avatar className="size-12 shrink-0 rounded-lg border">
+          <AvatarImage src={profile.profileImage || undefined} alt={profile.name} className="object-cover" />
+          <AvatarFallback className="rounded-lg text-sm">{profile.name?.[0] || '?'}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-base font-semibold leading-tight tracking-tight">{profile.name}</h2>
+          {profile.headline && (
+            <p className="mt-0.5 truncate text-xs leading-snug text-muted-foreground">{profile.headline}</p>
+          )}
+          <div className="mt-1 flex items-center gap-2">
             {profile.location && (
-              <p className="mt-2 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <MapPin className="size-3" />
+              <p className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                <MapPin className="size-2.5" />
                 {profile.location}
               </p>
             )}
+            <a
+              href={profile.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <ExternalLink className="size-2.5" />
+              profile
+            </a>
           </div>
         </div>
-
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={{ show: { transition: { staggerChildren: 0.05 } } }}
-          className="mt-10 grid grid-cols-1 gap-x-10 gap-y-8 md:grid-cols-3"
-        >
-          {profile.about && (
-            <Section label="About" span>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{profile.about}</p>
-            </Section>
-          )}
-
-          {skills.length > 0 && (
-            <Section label="Skills">
-              <div className="flex flex-wrap gap-1.5">
-                {skills.map((s) => (
-                  <Badge key={s} variant="secondary" className="font-normal">
-                    {s}
-                  </Badge>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {experience.length > 0 && (
-            <Section label="Experience" span>
-              <ul className="space-y-5">
-                {experience.map((e, i) => (
-                  <Entry
-                    key={i}
-                    title={e.title}
-                    subtitle={[e.company, e.location].filter(Boolean).join(' · ')}
-                    meta={range(e.startDate, e.endDate)}
-                    description={e.description}
-                  />
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {education.length > 0 && (
-            <Section label="Education">
-              <ul className="space-y-5">
-                {education.map((e, i) => (
-                  <Entry
-                    key={i}
-                    title={e.school}
-                    subtitle={[e.degree, e.field].filter(Boolean).join(', ')}
-                    meta={range(e.startDate, e.endDate)}
-                  />
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {certifications.length > 0 && (
-            <Section label="Certifications" span>
-              <ul className="space-y-4">
-                {certifications.map((c, i) => (
-                  <li key={i} className="border-l pl-4">
-                    <p className="text-sm font-medium">
-                      {c.url ? (
-                        <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
-                          {c.name || '—'}
-                        </a>
-                      ) : (
-                        c.name || '—'
-                      )}
-                    </p>
-                    {c.authority && <p className="text-sm text-muted-foreground">{c.authority}</p>}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {languages.length > 0 && (
-            <Section label="Languages">
-              <ul className="space-y-2">
-                {languages.map((l, i) => (
-                  <li key={i} className="flex items-baseline justify-between gap-3 text-sm">
-                    <span>{l.name || '—'}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground">{l.proficiency}</span>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-        </motion.div>
-
-        <a
-          href={profile.sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-10 block break-all font-mono text-[11px] text-muted-foreground hover:text-foreground"
-        >
-          {profile.sourceUrl}
-        </a>
       </div>
+
+      <motion.div
+        initial="hidden"
+        animate="show"
+        variants={{ show: { transition: { staggerChildren: 0.03 } } }}
+        className="grid grid-cols-1 gap-x-6 gap-y-3 p-4 md:grid-cols-2"
+      >
+        {profile.about && (
+          <Section label="About" span>
+            <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">{profile.about}</p>
+          </Section>
+        )}
+
+        {experience.length > 0 && (
+          <Section label="Experience">
+            <ul className="space-y-2">
+              {experience.slice(0, MAX_ENTRIES).map((e, i) => (
+                <Entry
+                  key={i}
+                  title={e.title}
+                  subtitle={[e.company, e.location].filter(Boolean).join(' · ')}
+                  meta={range(e.startDate, e.endDate)}
+                />
+              ))}
+            </ul>
+            <More count={experience.length - MAX_ENTRIES} />
+          </Section>
+        )}
+
+        {education.length > 0 && (
+          <Section label="Education">
+            <ul className="space-y-2">
+              {education.slice(0, MAX_ENTRIES).map((e, i) => (
+                <Entry
+                  key={i}
+                  title={e.school}
+                  subtitle={[e.degree, e.field].filter(Boolean).join(', ')}
+                  meta={range(e.startDate, e.endDate)}
+                />
+              ))}
+            </ul>
+            <More count={education.length - MAX_ENTRIES} />
+          </Section>
+        )}
+
+        {skills.length > 0 && (
+          <Section label="Skills">
+            <div className="flex flex-wrap gap-1">
+              {skills.slice(0, MAX_SKILLS).map((s) => (
+                <Badge key={s} variant="secondary" className="rounded-md px-1.5 py-0 text-[10px] font-normal">
+                  {s}
+                </Badge>
+              ))}
+              {skills.length > MAX_SKILLS && (
+                <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px] font-normal">
+                  +{skills.length - MAX_SKILLS}
+                </Badge>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {certifications.length > 0 && (
+          <Section label="Certifications">
+            <ul className="space-y-2">
+              {certifications.slice(0, MAX_ENTRIES).map((c, i) => (
+                <Entry key={i} title={c.name} subtitle={c.authority} />
+              ))}
+            </ul>
+            <More count={certifications.length - MAX_ENTRIES} />
+          </Section>
+        )}
+
+        {languages.length > 0 && (
+          <Section label="Languages">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              {languages.map((l, i) => (
+                <span key={i} className="text-muted-foreground">
+                  {l.name}
+                  {l.proficiency && <span className="text-[10px]"> · {l.proficiency}</span>}
+                </span>
+              ))}
+            </div>
+          </Section>
+        )}
+      </motion.div>
     </div>
   )
 }
