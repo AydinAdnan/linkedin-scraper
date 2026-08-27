@@ -27,8 +27,8 @@ export default function SearchBar({ url, setUrl, file, setFile, onSubmit, busy, 
           <Input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            disabled={busy}
-            placeholder={docked ? 'Another profile…' : 'Paste a LinkedIn profile URL'}
+            disabled={busy || !!file}
+            placeholder={file ? 'Remove the attached file to type a URL' : docked ? 'Another profile…' : 'Paste a LinkedIn profile URL'}
             className="h-10 border-0 bg-transparent shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
           />
           <input
@@ -36,14 +36,19 @@ export default function SearchBar({ url, setUrl, file, setFile, onSubmit, busy, 
             type="file"
             accept=".csv,.txt"
             hidden
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              const f = e.target.files?.[0] || null
+              setFile(f)
+              // it's one or the other, not both
+              if (f) setUrl('')
+            }}
           />
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            disabled={busy}
-            title="Attach .csv or .txt"
+            disabled={busy || !!url.trim()}
+            title={url.trim() ? 'Clear the URL to attach a file' : 'Attach .csv or .txt'}
             onClick={() => fileInput.current.click()}
             className="text-muted-foreground active:scale-97"
           >
