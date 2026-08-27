@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { AlertTriangle, ExternalLink, MapPin, Star } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -44,9 +45,67 @@ function Entry({ title, subtitle, meta }) {
   )
 }
 
-function More({ count }) {
-  if (count <= 0) return null
-  return <p className="pl-2.5 text-[10px] text-muted-foreground">+{count} more</p>
+// Shows the first `max` items; clicking "+N more" reveals the rest inside a
+// capped, independently scrollable area so the card itself never grows.
+function ExpandableList({ items, max, renderItem }) {
+  const [expanded, setExpanded] = useState(false)
+  const overflow = items.length - max
+  const visible = expanded ? items : items.slice(0, max)
+
+  return (
+    <>
+      <ul className={cn('space-y-2', expanded && 'max-h-40 overflow-y-auto pr-1')}>
+        {visible.map(renderItem)}
+      </ul>
+      {overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 pl-2.5 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+        >
+          {expanded ? 'Show less' : `+${overflow} more`}
+        </button>
+      )}
+    </>
+  )
+}
+
+function ExpandableBadges({ items, max }) {
+  const [expanded, setExpanded] = useState(false)
+  const overflow = items.length - max
+  const visible = expanded ? items : items.slice(0, max)
+
+  return (
+    <div>
+      <div className={cn('flex flex-wrap gap-1', expanded && 'max-h-24 overflow-y-auto pr-1')}>
+        {visible.map((s) => (
+          <Badge key={s} variant="secondary" className="rounded-md px-1.5 py-0 text-[10px] font-normal">
+            {s}
+          </Badge>
+        ))}
+        {!expanded && overflow > 0 && (
+          <Badge
+            asChild
+            variant="outline"
+            className="cursor-pointer rounded-md px-1.5 py-0 text-[10px] font-normal hover:bg-accent"
+          >
+            <button type="button" onClick={() => setExpanded(true)}>
+              +{overflow}
+            </button>
+          </Badge>
+        )}
+      </div>
+      {expanded && overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="mt-1 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Show less
+        </button>
+      )}
+    </div>
+  )
 }
 
 function StarButton({ starred, onToggle }) {
@@ -132,61 +191,51 @@ export default function Passport({ profile, starred, onToggleStar }) {
 
         {experience.length > 0 && (
           <Section label="Experience">
-            <ul className="space-y-2">
-              {experience.slice(0, MAX_ENTRIES).map((e, i) => (
+            <ExpandableList
+              items={experience}
+              max={MAX_ENTRIES}
+              renderItem={(e, i) => (
                 <Entry
                   key={i}
                   title={e.title}
                   subtitle={[e.company, e.location].filter(Boolean).join(' · ')}
                   meta={range(e.startDate, e.endDate)}
                 />
-              ))}
-            </ul>
-            <More count={experience.length - MAX_ENTRIES} />
+              )}
+            />
           </Section>
         )}
 
         {education.length > 0 && (
           <Section label="Education">
-            <ul className="space-y-2">
-              {education.slice(0, MAX_ENTRIES).map((e, i) => (
+            <ExpandableList
+              items={education}
+              max={MAX_ENTRIES}
+              renderItem={(e, i) => (
                 <Entry
                   key={i}
                   title={e.school}
                   subtitle={[e.degree, e.field].filter(Boolean).join(', ')}
                   meta={range(e.startDate, e.endDate)}
                 />
-              ))}
-            </ul>
-            <More count={education.length - MAX_ENTRIES} />
+              )}
+            />
           </Section>
         )}
 
         {skills.length > 0 && (
           <Section label="Skills">
-            <div className="flex flex-wrap gap-1">
-              {skills.slice(0, MAX_SKILLS).map((s) => (
-                <Badge key={s} variant="secondary" className="rounded-md px-1.5 py-0 text-[10px] font-normal">
-                  {s}
-                </Badge>
-              ))}
-              {skills.length > MAX_SKILLS && (
-                <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px] font-normal">
-                  +{skills.length - MAX_SKILLS}
-                </Badge>
-              )}
-            </div>
+            <ExpandableBadges items={skills} max={MAX_SKILLS} />
           </Section>
         )}
 
         {certifications.length > 0 && (
           <Section label="Certifications">
-            <ul className="space-y-2">
-              {certifications.slice(0, MAX_ENTRIES).map((c, i) => (
-                <Entry key={i} title={c.name} subtitle={c.authority} />
-              ))}
-            </ul>
-            <More count={certifications.length - MAX_ENTRIES} />
+            <ExpandableList
+              items={certifications}
+              max={MAX_ENTRIES}
+              renderItem={(c, i) => <Entry key={i} title={c.name} subtitle={c.authority} />}
+            />
           </Section>
         )}
 
