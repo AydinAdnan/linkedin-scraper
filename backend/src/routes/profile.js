@@ -1,5 +1,5 @@
 import { fetchProfile } from "../services/linkedin.js";
-import { CookiesExpiredError } from "../lib/voyagerClient.js";
+import { CookiesExpiredError, ProfileNotFoundError, ProfileRestrictedError } from "../lib/voyagerClient.js";
 import { normalizeProfileUrl } from "../lib/validateUrl.js";
 import { parseBatchInput, MAX_ROWS } from "../lib/parseBatchInput.js";
 import { planBatchRows } from "../lib/planBatch.js";
@@ -8,8 +8,19 @@ import { config } from "../config.js";
 const MAX_CONCURRENT_BATCHES = 3;
 let activeBatches = 0;
 
+// Not-found and restricted profiles are dead ends, never worth a retry —
+// callers get a distinct code for each so the UI can tell "doesn't exist" /
+// "private" apart from a transient fetch failure, and the batch loop just
+// moves straight on to the next row.
 function errorCode(err) {
-  return err instanceof CookiesExpiredError ? "COOKIES_EXPIRED" : "FETCH_FAILED";
+  if (err instanceof CookiesExpiredError) return "COOKIES_EXPIRED";
+  if (err instanceof ProfileNotFoundError) return "PROFILE_NOT_FOUND";
+  if (err instanceof ProfileRestrictedError) return "PROFILE_RESTRICTED";
+  return "FETCH_FAILED";
+}
+
+function statusFor(code) {
+  return { COOKIES_EXPIRED: 401, PROFILE_NOT_FOUND: 404, PROFILE_RESTRICTED: 403 }[code] || 502;
 }
 
 // Don't echo raw error internals to callers in production — keep them for
@@ -39,7 +50,7 @@ export default async function profileRoutes(app) {
         return await fetchProfile(req.body.url);
       } catch (err) {
         const code = errorCode(err);
-        return reply.code(code === "COOKIES_EXPIRED" ? 401 : 502).send({ error: code, detail: safeDetail(err) });
+        return reply.code(statusFor(code)).send({ error: code, detail: safeDetail(err) });
       }
     }
   );

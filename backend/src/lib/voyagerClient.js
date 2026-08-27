@@ -12,6 +12,23 @@ export class CookiesExpiredError extends Error {
   }
 }
 
+// Member genuinely doesn't exist / URL is dead — never worth retrying.
+export class ProfileNotFoundError extends Error {
+  constructor() {
+    super("No LinkedIn profile exists at this URL.");
+    this.statusCode = 404;
+  }
+}
+
+// Profile exists but its data isn't visible to this account (private,
+// out-of-network restricted, memorialized, etc) — also never worth retrying.
+export class ProfileRestrictedError extends Error {
+  constructor() {
+    super("This profile's details aren't visible to the logged-in account.");
+    this.statusCode = 403;
+  }
+}
+
 export function voyagerClient() {
   if (!config.liAt || !config.jsessionid) {
     throw new CookiesExpiredError();
@@ -45,6 +62,8 @@ export function voyagerClient() {
       if (status === 401 || status === 999 || (status >= 300 && status < 400)) {
         throw new CookiesExpiredError();
       }
+      if (status === 404) throw new ProfileNotFoundError();
+      if (status === 403) throw new ProfileRestrictedError();
       throw err;
     }
   );

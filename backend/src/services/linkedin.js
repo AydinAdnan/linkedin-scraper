@@ -1,7 +1,7 @@
 import { writeFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import { voyagerClient } from "../lib/voyagerClient.js";
+import { voyagerClient, ProfileRestrictedError } from "../lib/voyagerClient.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { enqueue } from "../lib/queue.js";
 import { normalizeProfileUrl } from "../lib/validateUrl.js";
@@ -125,7 +125,14 @@ async function fetchProfileUncached(url) {
     );
   }
 
-  return { sourceUrl: url, ...parseProfileView(data) };
+  const parsed = parseProfileView(data);
+  // LinkedIn doesn't always 403 a restricted profile — a private/out-of-network
+  // profile can come back as a 200 with no usable profile entity at all.
+  // Treat "no name" the same as an explicit restriction rather than returning
+  // an empty-looking success.
+  if (!parsed.name) throw new ProfileRestrictedError();
+
+  return { sourceUrl: url, ...parsed };
 }
 
 export async function fetchProfile(url) {
