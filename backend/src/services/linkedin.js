@@ -1,7 +1,13 @@
+import { writeFile } from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import { voyagerClient } from "../lib/voyagerClient.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { enqueue } from "../lib/queue.js";
 import { normalizeProfileUrl } from "../lib/validateUrl.js";
+import { config } from "../config.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function extractPublicIdentifier(url) {
   const canonical = normalizeProfileUrl(url);
@@ -9,17 +15,19 @@ export function extractPublicIdentifier(url) {
   return canonical.split("/in/")[1];
 }
 
-// Voyager responses are a flat `included` array of typed entities linked by
-// entityUrn — build a lookup by $type so we can pull out each section
-// regardless of ordering.
-function groupByType(included = []) {
-  const byType = {};
-  for (const entity of included) {
-    const type = entity.$type;
-    if (!type) continue;
-    (byType[type] ||= []).push(entity);
-  }
-  return byType;
+// LinkedIn's `included` array is a flat, normalized list of entities linked
+// by entityUrn. Match $type by substring (not exact string) because the
+// same section (Position, Education, ...) shows up under different fully
+// qualified type names depending on which Voyager endpoint served it
+// (classic "identity.profile.X" vs newer "dash.identity.profile.X").
+function entitiesMatching(included, keyword) {
+  return included.filter((e) => typeof e.$type === "string" && e.$type.includes(keyword));
+}
+
+function findProfile(included) {
+  return (
+    included.find((e) => typeof e.$type === "string" && e.$type.includes("Profile") && e.firstName) || {}
+  );
 }
 
 function resolveImage(picture) {
@@ -29,38 +37,51 @@ function resolveImage(picture) {
   return `${root.rootUrl}${artifact.fileIdentifyingUrlPathSegment}`;
 }
 
-function parseProfileView(raw) {
-  const byType = groupByType(raw.included);
-  const profile = byType["com.linkedin.voyager.identity.profile.Profile"]?.[0] || {};
+// Old profileView used `timePeriod: { startDate, endDate }`, the newer dash
+// endpoint uses `dateRange: { start, end }` — accept either.
+function dateRange(entity) {
+  const range = entity.timePeriod || entity.dateRange;
+  return { start: range?.startDate || range?.start || null, end: range?.endDate || range?.end || null };
+}
 
-  const positions = byType["com.linkedin.voyager.identity.profile.Position"] || [];
-  const educations = byType["com.linkedin.voyager.identity.profile.Education"] || [];
-  const skills = byType["com.linkedin.voyager.identity.profile.Skill"] || [];
-  const certifications = byType["com.linkedin.voyager.identity.profile.Certification"] || [];
-  const languages = byType["com.linkedin.voyager.identity.profile.Language"] || [];
+function parseProfileView(raw) {
+  const included = raw.included || [];
+  const profile = findProfile(included);
+
+  const positions = entitiesMatching(included, "Position");
+  const educations = entitiesMatching(included, "Education");
+  const skills = entitiesMatching(included, "Skill");
+  const certifications = entitiesMatching(included, "Certification");
+  const languages = entitiesMatching(included, "Language");
 
   return {
-    name: [profile.firstName, profile.lastName].filter(Boolean).join(" "),
+    name: [profile.firstName, profile.lastName].filter(Boolean).join(" ") || null,
     headline: profile.headline || null,
     location: profile.geoLocationName || profile.locationName || null,
     about: profile.summary || null,
     profileImage: resolveImage(profile.profilePicture),
     bannerImage: resolveImage(profile.backgroundPicture),
-    experience: positions.map((p) => ({
-      title: p.title || null,
-      company: p.companyName || null,
-      location: p.locationName || null,
-      startDate: p.timePeriod?.startDate || null,
-      endDate: p.timePeriod?.endDate || null,
-      description: p.description || null,
-    })),
-    education: educations.map((e) => ({
-      school: e.schoolName || null,
-      degree: e.degreeName || null,
-      field: e.fieldOfStudy || null,
-      startDate: e.timePeriod?.startDate || null,
-      endDate: e.timePeriod?.endDate || null,
-    })),
+    experience: positions.map((p) => {
+      const { start, end } = dateRange(p);
+      return {
+        title: p.title || null,
+        company: p.companyName || null,
+        location: p.locationName || null,
+        startDate: start,
+        endDate: end,
+        description: p.description || null,
+      };
+    }),
+    education: educations.map((e) => {
+      const { start, end } = dateRange(e);
+      return {
+        school: e.schoolName || null,
+        degree: e.degreeName || null,
+        field: e.fieldOfStudy || null,
+        startDate: start,
+        endDate: end,
+      };
+    }),
     skills: skills.map((s) => s.name).filter(Boolean),
     certifications: certifications.map((c) => ({
       name: c.name || null,
@@ -77,7 +98,23 @@ function parseProfileView(raw) {
 async function fetchProfileUncached(url) {
   const publicId = extractPublicIdentifier(url);
   const client = voyagerClient();
-  const { data } = await client.get(`/identity/profiles/${publicId}/profileView`);
+  const { data } = await client.get("/identity/dash/profiles", {
+    params: {
+      q: "memberIdentity",
+      memberIdentity: publicId,
+      decorationId: config.profileDecorationId,
+    },
+  });
+
+  // LinkedIn's exact field/entity names drift over time (see README "known
+  // limitations"). Dumping the raw response makes it easy to diff against
+  // when a field silently starts coming back null instead of crashing blind.
+  if (process.env.NODE_ENV !== "production") {
+    await writeFile(path.join(__dirname, "..", "..", "debug-last-profile.json"), JSON.stringify(data, null, 2)).catch(
+      () => {}
+    );
+  }
+
   return { sourceUrl: url, ...parseProfileView(data) };
 }
 

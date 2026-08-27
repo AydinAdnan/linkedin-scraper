@@ -24,7 +24,7 @@ export function voyagerClient() {
       "csrf-token": config.jsessionid,
       "x-restli-protocol-version": "2.0.0",
       "x-li-lang": "en_US",
-      accept: "application/json",
+      accept: "application/vnd.linkedin.normalized+json+2.1",
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
     },
