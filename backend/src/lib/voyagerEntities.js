@@ -14,9 +14,15 @@ export function entitiesMatching(included, keyword) {
 }
 
 export function resolveImage(picture) {
-  // Newer dash endpoints nest it under displayImageReference.vectorImage;
-  // older ones embedded it directly — accept either.
-  const root = picture?.displayImageReference?.vectorImage || picture?.["com.linkedin.common.VectorImage"];
+  // Image shape varies by entity/endpoint: newer dash profile pictures nest
+  // under displayImageReference.vectorImage; older profileView embedded it
+  // directly; company logos wrap it in an extra `.image`; company cover
+  // photos are already flat {rootUrl, artifacts}. Try each in order.
+  const root =
+    picture?.displayImageReference?.vectorImage ||
+    picture?.["com.linkedin.common.VectorImage"] ||
+    picture?.image ||
+    (picture?.artifacts ? picture : null);
   const artifacts = root?.artifacts || [];
   // Artifacts aren't sorted by size — pick the largest so we don't grab a thumbnail.
   const biggest = artifacts.reduce((a, b) => ((b.width || 0) > (a?.width || 0) ? b : a), null);

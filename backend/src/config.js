@@ -25,4 +25,8 @@ export const config = {
   profileDecorationId:
     process.env.PROFILE_DECORATION_ID ||
     "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-93",
+  // Omitting decorationId entirely returns a usable default company
+  // decoration (verified live) — set this only if you've found a specific
+  // decorationId (from a browser's network tab) that returns richer data.
+  companyDecorationId: process.env.COMPANY_DECORATION_ID || "",
 };

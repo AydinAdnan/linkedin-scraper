@@ -1,12 +1,20 @@
 import { fetchProfile } from "../services/linkedin.js";
+import { fetchCompany } from "../services/company.js";
 import { CookiesExpiredError, ProfileNotFoundError, ProfileRestrictedError } from "../lib/voyagerClient.js";
-import { normalizeProfileUrl } from "../lib/validateUrl.js";
+import { normalizeLinkedInUrl } from "../lib/validateUrl.js";
 import { parseBatchInput, MAX_ROWS } from "../lib/parseBatchInput.js";
 import { planBatchRows } from "../lib/planBatch.js";
 import { config } from "../config.js";
 
 const MAX_CONCURRENT_BATCHES = 3;
 let activeBatches = 0;
+
+// Profile and company data live behind completely different Voyager
+// endpoints with different schemas (see services/linkedin.js vs
+// services/company.js) — this is the one place that picks which to call.
+function fetchEntity(canonical, type) {
+  return type === "company" ? fetchCompany(canonical) : fetchProfile(canonical);
+}
 
 // Not-found and restricted profiles are dead ends, never worth a retry —
 // callers get a distinct code for each so the UI can tell "doesn't exist" /
@@ -55,11 +63,12 @@ export default async function profileRoutes(app) {
       },
     },
     async (req, reply) => {
-      if (!normalizeProfileUrl(req.body.url)) {
-        return reply.code(400).send({ error: "INVALID_PROFILE_URL" });
+      const parsed = normalizeLinkedInUrl(req.body.url);
+      if (!parsed) {
+        return reply.code(400).send({ error: "INVALID_LINKEDIN_URL" });
       }
       try {
-        return await fetchProfile(req.body.url);
+        return await fetchEntity(parsed.canonical, parsed.type);
       } catch (err) {
         const code = errorCode(err);
         logFetchError(req, err, code, req.body.url);
@@ -142,7 +151,7 @@ export default async function profileRoutes(app) {
             continue;
           }
           try {
-            const data = await fetchProfile(item.canonical);
+            const data = await fetchEntity(item.canonical, item.type);
             tally.ok++;
             reply.raw.write(JSON.stringify({ row: item.row, ...data }) + "\n");
           } catch (err) {

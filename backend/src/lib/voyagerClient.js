@@ -12,22 +12,23 @@ export class CookiesExpiredError extends Error {
   }
 }
 
-// Member genuinely doesn't exist / URL is dead — never worth retrying.
+// Shared between profiles and companies — the entity genuinely doesn't
+// exist / URL is dead — never worth retrying.
 export class ProfileNotFoundError extends Error {
   constructor() {
-    super("No LinkedIn profile exists at this URL.");
+    super("No LinkedIn page exists at this URL.");
     this.statusCode = 404;
   }
 }
 
-// LinkedIn returned 403 (or a 200 with a matched-but-empty profile). This
-// usually means private/out-of-network — but LinkedIn also 403s some
-// nonexistent usernames instead of 404ing them (likely deliberate, to stop
-// enumeration attacks), so treat this as "not accessible" rather than a
-// confirmed "this profile is private." Never worth retrying either way.
+// LinkedIn returned 403 (or a 200 with a matched-but-empty entity). For
+// profiles this usually means private/out-of-network — but LinkedIn also
+// 403s some nonexistent URLs instead of 404ing them (likely deliberate, to
+// stop enumeration attacks), so treat this as "not accessible" rather than a
+// confirmed "this is private." Never worth retrying either way.
 export class ProfileRestrictedError extends Error {
   constructor() {
-    super("This profile isn't accessible to the logged-in account (private, or may not exist).");
+    super("This LinkedIn page isn't accessible to the logged-in account (private, or may not exist).");
     this.statusCode = 403;
   }
 }
