@@ -20,6 +20,11 @@ await page.waitForURL("https://www.linkedin.com/feed/**", { timeout: 0 });
 const cookies = await context.cookies();
 const liAt = cookies.find((c) => c.name === "li_at")?.value;
 const jsessionid = cookies.find((c) => c.name === "JSESSIONID")?.value?.replaceAll('"', "");
+// LinkedIn ties a session to the client that created it. If the backend later
+// makes API calls with a different User-Agent than the browser that logged
+// in, that mismatch alone is a strong bot signal — so capture the real one
+// and reuse it for every request instead of hardcoding a guess.
+const userAgent = await page.evaluate(() => navigator.userAgent);
 
 if (!liAt || !jsessionid) {
   console.error("Could not find li_at / JSESSIONID cookies. Try again.");
@@ -36,6 +41,7 @@ const setVar = (contents, key, value) => {
 };
 env = setVar(env, "LI_AT", liAt);
 env = setVar(env, "LI_JSESSIONID", jsessionid);
+env = setVar(env, "LI_USER_AGENT", `"${userAgent}"`);
 writeFileSync(envPath, env);
 
 console.log("Saved LI_AT and LI_JSESSIONID to .env");
