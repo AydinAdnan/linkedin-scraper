@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, Building2, ExternalLink, MapPin, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { ExpandableBadges } from '@/components/Expandable'
+import { ExpandableBadges, ClampBox } from '@/components/Expandable'
 import StarButton from '@/components/StarButton'
 
 function Stat({ label, value }) {
@@ -91,11 +91,12 @@ export default function CompanyCard({ profile, starred, onToggleStar }) {
         </div>
       </div>
 
+      <ClampBox maxHeight={280} className="px-4 pb-3 pt-4">
       <motion.div
         initial="hidden"
         animate="show"
         variants={{ show: { transition: { staggerChildren: 0.03 } } }}
-        className="space-y-3 p-4"
+        className="space-y-3"
       >
         {profile.about && (
           <motion.p
@@ -151,6 +152,7 @@ export default function CompanyCard({ profile, starred, onToggleStar }) {
           </motion.p>
         )}
       </motion.div>
+      </ClampBox>
     </div>
   )
 }

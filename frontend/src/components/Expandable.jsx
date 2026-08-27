@@ -1,6 +1,48 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+
+// Clamps a whole block of content to a fixed height so cards with wildly
+// different amounts of data (some people/companies have every section
+// filled, others almost none) still read as the same size in the carousel —
+// only shows "Show more" when the content actually overflows that height.
+export function ClampBox({ maxHeight = 280, className, children }) {
+  const ref = useRef(null)
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setOverflowing(el.scrollHeight > maxHeight + 1)
+  }, [children, maxHeight])
+
+  return (
+    <div className={cn('relative', className)}>
+      <div
+        ref={ref}
+        style={{ maxHeight: expanded ? undefined : maxHeight }}
+        className="relative overflow-hidden"
+      >
+        {children}
+        {!expanded && overflowing && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent" />
+        )}
+      </div>
+      {overflowing && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="relative mt-1 flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ChevronDown className={cn('size-3 transition-transform', expanded && 'rotate-180')} />
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  )
+}
 
 // Shows the first `max` items; clicking "+N more" reveals the rest inside a
 // capped, independently scrollable area so the card itself never grows.

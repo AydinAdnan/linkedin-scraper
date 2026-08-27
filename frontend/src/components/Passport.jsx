@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { AlertTriangle, ExternalLink, MapPin } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ExpandableList, ExpandableBadges } from '@/components/Expandable'
+import { ExpandableList, ExpandableBadges, ClampBox } from '@/components/Expandable'
 import StarButton from '@/components/StarButton'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -96,11 +96,12 @@ export default function Passport({ profile, starred, onToggleStar }) {
         </div>
       </div>
 
+      <ClampBox maxHeight={280} className="px-4 pb-3 pt-4">
       <motion.div
         initial="hidden"
         animate="show"
         variants={{ show: { transition: { staggerChildren: 0.03 } } }}
-        className="grid grid-cols-1 gap-x-6 gap-y-3 p-4 md:grid-cols-2"
+        className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2"
       >
         {profile.about && (
           <Section label="About" span>
@@ -171,6 +172,7 @@ export default function Passport({ profile, starred, onToggleStar }) {
           </Section>
         )}
       </motion.div>
+      </ClampBox>
     </div>
   )
 }
