@@ -28,7 +28,7 @@ export default function SearchBar({ url, setUrl, file, setFile, onSubmit, busy, 
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             disabled={busy || !!file}
-            placeholder={file ? 'Remove the attached file to type a URL' : docked ? 'Another profile…' : 'Paste a LinkedIn profile URL'}
+            placeholder={file ? '' : docked ? 'Another profile…' : 'Paste a LinkedIn profile URL'}
             className="h-10 border-0 bg-transparent shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
           />
           <input
