@@ -13,6 +13,23 @@ export function entitiesMatching(included, keyword) {
   return included.filter((e) => typeof e.$type === "string" && e.$type.includes(keyword));
 }
 
+// The top-level response is a Rest.li CollectionResponse — `data["*elements"]`
+// names the entityUrn of the entity actually being requested. This matters
+// because `included` can also embed *other* entities of the same kind (e.g.
+// a profile lookup bundles in "people also viewed" suggestions) — grabbing
+// the first entity of the right shape/type can silently return a stranger's
+// data instead of the one that was asked for. Match by entityUrn first;
+// only fall back to the shape-based heuristic if that fails.
+export function findMatchedEntity(raw, keyword, isCandidate) {
+  const included = raw.included || [];
+  const targetUrn = raw.data?.["*elements"]?.[0];
+  if (targetUrn) {
+    const match = included.find((e) => e.entityUrn === targetUrn);
+    if (match) return match;
+  }
+  return included.find((e) => typeof e.$type === "string" && e.$type.includes(keyword) && isCandidate(e)) || {};
+}
+
 export function resolveImage(picture) {
   // Image shape varies by entity/endpoint: newer dash profile pictures nest
   // under displayImageReference.vectorImage; older profileView embedded it

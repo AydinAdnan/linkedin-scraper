@@ -4,7 +4,14 @@ import { voyagerClient } from "../lib/voyagerClient.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { enqueue } from "../lib/queue.js";
 import { normalizeProfileUrl } from "../lib/validateUrl.js";
-import { entitiesMatching, resolveImage, dateRange, dumpDebug, classifyMissing } from "../lib/voyagerEntities.js";
+import {
+  entitiesMatching,
+  findMatchedEntity,
+  resolveImage,
+  dateRange,
+  dumpDebug,
+  classifyMissing,
+} from "../lib/voyagerEntities.js";
 import { config } from "../config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,15 +22,13 @@ export function extractPublicIdentifier(url) {
   return canonical.split("/in/")[1];
 }
 
-function findProfile(included) {
-  return (
-    included.find((e) => typeof e.$type === "string" && e.$type.includes("Profile") && e.firstName) || {}
-  );
-}
-
 function parseProfileView(raw) {
   const included = raw.included || [];
-  const profile = findProfile(included);
+  // A profile lookup response also embeds unrelated Profile-shaped entities
+  // (e.g. "people also viewed" suggestions) — must match by the requested
+  // entityUrn, not just "first Profile-shaped thing with a firstName",
+  // or this can silently return a completely different person's name.
+  const profile = findMatchedEntity(raw, "Profile", (e) => e.firstName);
 
   const positions = entitiesMatching(included, "Position");
   const educations = entitiesMatching(included, "Education");

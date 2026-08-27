@@ -4,7 +4,7 @@ import { voyagerClient } from "../lib/voyagerClient.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
 import { enqueue } from "../lib/queue.js";
 import { normalizeLinkedInUrl } from "../lib/validateUrl.js";
-import { resolveImage, dumpDebug, classifyMissing } from "../lib/voyagerEntities.js";
+import { resolveImage, dumpDebug, classifyMissing, findMatchedEntity } from "../lib/voyagerEntities.js";
 import { config } from "../config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,10 +13,6 @@ export function extractUniversalName(url) {
   const parsed = normalizeLinkedInUrl(url);
   if (!parsed || parsed.type !== "company") throw new Error("Not a valid LinkedIn company URL");
   return parsed.canonical.split("/company/")[1];
-}
-
-function findCompany(included) {
-  return included.find((e) => typeof e.$type === "string" && e.$type.includes("Company") && e.name) || {};
 }
 
 function findFollowerCount(included) {
@@ -33,7 +29,9 @@ function findFollowerCount(included) {
 // from a sibling FollowingInfo entity.
 function parseCompany(raw) {
   const included = raw.included || [];
-  const company = findCompany(included);
+  // Match by the requested entityUrn, not just "first Company-shaped thing"
+  // — see the same fix in linkedin.js for why that's unsafe.
+  const company = findMatchedEntity(raw, "Company", (e) => e.name);
 
   const headquarters = company.headquarter
     ? [company.headquarter.city, company.headquarter.geographicArea, company.headquarter.country]
