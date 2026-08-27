@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import SearchBar from '@/components/SearchBar'
 import Passport from '@/components/Passport'
 import ExportMenu from '@/components/ExportMenu'
 import HazardBanner from '@/components/HazardBanner'
+import CarouselNav from '@/components/CarouselNav'
 import { Skeleton } from '@/components/ui/skeleton'
 import { authStatus, fetchProfile, streamBatch, SessionExpiredError, ApiError } from '@/api'
 import { cn } from '@/lib/utils'
@@ -64,6 +65,21 @@ function Notice({ children }) {
   )
 }
 
+function SuccessNotice({ children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4, filter: 'blur(4px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, filter: 'blur(4px)' }}
+      transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+      className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 p-3 text-xs leading-relaxed text-success"
+    >
+      <CheckCircle2 className="size-4 shrink-0" />
+      <span>{children}</span>
+    </motion.div>
+  )
+}
+
 function loadStarred() {
   try {
     return new Set(JSON.parse(localStorage.getItem(STARRED_KEY) || '[]'))
@@ -79,9 +95,13 @@ export default function App() {
   const [streaming, setStreaming] = useState(false)
   const [results, setResults] = useState([])
   const [unavailable, setUnavailable] = useState([])
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [direction, setDirection] = useState(1)
   const [error, setError] = useState('')
+  const [done, setDone] = useState('')
   const [loggedIn, setLoggedIn] = useState(true)
   const [starred, setStarred] = useState(loadStarred)
+  const doneTimer = useRef(null)
 
   const reduced = useReducedMotion()
   const spring = reduced ? { duration: 0 } : { type: 'spring', duration: 0.55, bounce: 0.12 }
@@ -106,21 +126,33 @@ export default function App() {
     })
   }
 
+  function goTo(nextIndex) {
+    setDirection(nextIndex > activeIndex ? 1 : -1)
+    setActiveIndex(nextIndex)
+  }
+
   async function run() {
+    clearTimeout(doneTimer.current)
     setBusy(true)
     setError('')
+    setDone('')
     setResults([])
     setUnavailable([])
+    setActiveIndex(0)
     try {
       if (file) {
         setStreaming(true)
+        let ok = 0
         await streamBatch({ file }, (row) => {
           if (UNAVAILABLE_CODES.has(row.error)) {
             setUnavailable((u) => [...u, { url: row.sourceUrl, reason: row.error }])
           } else {
+            ok++
             setResults((r) => [...r, row])
           }
         })
+        setDone(`Done — ${ok} profile${ok === 1 ? '' : 's'} loaded`)
+        doneTimer.current = setTimeout(() => setDone(''), 5000)
       } else {
         const data = await fetchProfile(url.trim())
         setResults([{ row: 0, ...data }])
@@ -189,6 +221,7 @@ export default function App() {
             {!loggedIn && !error && (
               <Notice key="auth">No LinkedIn session on the backend — requests will fail until the admin logs in.</Notice>
             )}
+            {done && !error && <SuccessNotice key="done">{done}</SuccessNotice>}
           </AnimatePresence>
           <HazardBanner items={unavailable} />
         </div>
@@ -213,26 +246,36 @@ export default function App() {
 
           {busy && results.length === 0 && <ResultsSkeleton />}
 
-          <AnimatePresence initial={false}>
-            {results.map((row) => (
-              <motion.div
-                key={rowKey(row)}
-                layout
-                initial={{ opacity: 0, y: 12, filter: reduced ? 'none' : 'blur(8px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, filter: reduced ? 'none' : 'blur(8px)' }}
-                transition={{ duration: reduced ? 0 : 0.35, ease: [0.23, 1, 0.32, 1] }}
-              >
-                <Passport
-                  profile={row}
-                  starred={starred.has(rowKey(row))}
-                  onToggleStar={() => toggleStar(rowKey(row))}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {results.length > 0 && (
+            <>
+              <div className="overflow-hidden">
+                <AnimatePresence initial={false} mode="wait" custom={direction}>
+                  {results[activeIndex] && (
+                    <motion.div
+                      key={rowKey(results[activeIndex])}
+                      custom={direction}
+                      initial={{ opacity: 0, x: reduced ? 0 : 24 * direction, filter: reduced ? 'none' : 'blur(8px)' }}
+                      animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, x: reduced ? 0 : -24 * direction, filter: reduced ? 'none' : 'blur(8px)' }}
+                      transition={{ duration: reduced ? 0 : 0.3, ease: [0.23, 1, 0.32, 1] }}
+                    >
+                      <Passport
+                        profile={results[activeIndex]}
+                        starred={starred.has(rowKey(results[activeIndex]))}
+                        onToggleStar={() => toggleStar(rowKey(results[activeIndex]))}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-          {streaming && (
+              <div className="flex justify-center">
+                <CarouselNav index={activeIndex} total={results.length} onChange={goTo} />
+              </div>
+            </>
+          )}
+
+          {streaming && results.length > 0 && activeIndex === results.length - 1 && (
             <motion.div
               key="trailing-skeleton"
               initial={{ opacity: 0, filter: reduced ? 'none' : 'blur(8px)' }}
