@@ -33,6 +33,7 @@ app.addHook("onRequest", async (req, reply) => {
 });
 
 app.get("/health", async () => ({ ok: true }));
+app.get("/openapi.json", async () => app.swagger());
 await app.register(authRoutes);
 await app.register(profileRoutes);
 
