@@ -2,7 +2,7 @@ import { parseCsv } from "./csv.js";
 
 export const MAX_FILE_BYTES = 1024 * 1024; // 1 MB
 export const MAX_ROWS = 50;
-const URL_COLUMNS = ["url", "profile_url", "linkedin_url"];
+const URL_COLUMNS = ["url", "profile_url", "linkedin_url", "company_url"];
 
 export class BatchInputError extends Error {
   constructor(message) {
