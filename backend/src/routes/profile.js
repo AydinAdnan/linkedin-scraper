@@ -49,16 +49,27 @@ function logFetchError(req, err, code, url) {
   }
 }
 
+const errorResponse = { type: "object", properties: { error: { type: "string" }, detail: { type: "string" } } };
+
 export default async function profileRoutes(app) {
   app.post(
     "/api/profile",
     {
       schema: {
-        description: "Fetch a single LinkedIn profile as structured JSON",
+        description: "Fetch a single LinkedIn profile or company",
+        security: [{ apiKey: [] }],
         body: {
           type: "object",
           required: ["url"],
           properties: { url: { type: "string" } },
+        },
+        response: {
+          200: { type: "object", additionalProperties: true, properties: { type: { type: "string", enum: ["profile", "company"] } } },
+          400: errorResponse,
+          401: errorResponse,
+          403: errorResponse,
+          404: errorResponse,
+          502: errorResponse,
         },
       },
     },
@@ -84,7 +95,10 @@ export default async function profileRoutes(app) {
     "/api/profile/batch",
     {
       schema: {
-        description: "Fetch a batch of LinkedIn profiles (JSON array or CSV/TXT file upload)",
+        description: "Fetch a batch of profiles/companies (JSON `{urls:[]}` or multipart CSV/TXT upload), streamed as NDJSON",
+        security: [{ apiKey: [] }],
+        consumes: ["application/json", "multipart/form-data"],
+        response: { 400: errorResponse, 429: errorResponse },
       },
     },
     async (req, reply) => {

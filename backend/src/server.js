@@ -19,7 +19,12 @@ await app.register(helmet);
 await app.register(cors, { origin: config.frontendUrl });
 await app.register(multipart, { limits: { fileSize: MAX_FILE_BYTES } });
 await app.register(rateLimit, { max: config.rateLimitMax, timeWindow: "1 minute" });
-await app.register(swagger, { openapi: { info: { title: "LinkedIn Profile API", version: "1.0.0" } } });
+await app.register(swagger, {
+  openapi: {
+    info: { title: "LinkedIn Profile API", version: "1.0.0" },
+    components: { securitySchemes: { apiKey: { type: "apiKey", in: "header", name: "x-api-key" } } },
+  },
+});
 await app.register(swaggerUi, { routePrefix: "/docs" });
 
 // Gate the actual LinkedIn-fetching endpoints behind an API key when one is
@@ -32,8 +37,12 @@ app.addHook("onRequest", async (req, reply) => {
   }
 });
 
-app.get("/health", async () => ({ ok: true }));
-app.get("/openapi.json", async () => app.swagger());
+app.get(
+  "/health",
+  { schema: { response: { 200: { type: "object", properties: { ok: { type: "boolean" } } } } } },
+  async () => ({ ok: true })
+);
+app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 await app.register(authRoutes);
 await app.register(profileRoutes);
 
